@@ -220,10 +220,14 @@ def seed_if_needed(db_path: str | None = None) -> None:
             VALUES ('system', '种子初始化', 'lab', 0, '首次启动写入临床试验访视样例')
             """
         )
-        try:
-            from app.services.dead_letter import seed_skew
-            seed_skew(db_path)
-        except Exception:
-            pass
         _meta_set(conn, "seeded", "1")
         _meta_set(conn, "seed_version", "clinic-1")
+
+    # 回炉初始态在种子事务提交后再落，避免跨连接写锁被静默吞掉。
+    try:
+        from app.services.dead_letter import normalize_legacy, seed_skew
+
+        seed_skew(db_path)
+        normalize_legacy(db_path)
+    except Exception:
+        pass

@@ -17,7 +17,6 @@ from app.services import reconcile as reconcile_svc
 from app.services import settings as settings_svc
 from app.services import dead_letter as dead_letter_svc
 from app.services import dead_letter_cutover as dead_letter_cutover_svc
-from app.services import dead_letter_dualwrite as dead_letter_dual_svc
 from app.services import sites as sites_svc
 from app.services import visits as visits_svc
 from app.services.errors import ServiceError
@@ -451,22 +450,28 @@ class Api:
 
     @cherrypy.expose
     @_wrap
+    def dead_letter_state(self):
+        _require()
+        return _json(dead_letter_svc.state())
+
+    @cherrypy.expose
+    @_wrap
     def dead_letter_commit(self):
         _require()
         body = _read_json()
-        return _json(dead_letter_svc.commit_action(body))
+        return _json(dead_letter_svc.settle_reflow(body))
 
     @cherrypy.expose
     @_wrap
     def dead_letter_half(self):
         _require()
-        return _json(dead_letter_svc.reconcile_display())
+        return _json(dead_letter_svc.settle_display_only())
 
     @cherrypy.expose
     @_wrap
     def dead_letter_snap(self):
         _require()
-        return _json(dead_letter_svc.snapshot())
+        return _json(dead_letter_svc.state())
 
     @cherrypy.expose
     @_wrap
@@ -482,10 +487,15 @@ class Api:
 
     @cherrypy.expose
     @_wrap
-    def dead_letter_dual(self):
+    def dead_letter_reflows(self):
         _require()
-        body = _read_json()
-        return _json(dead_letter_dual_svc.apply_dualwrite(str(body.get("note") or "回炉钉定")))
+        return _json({"items": dead_letter_svc.list_reflows()})
+
+    @cherrypy.expose
+    @_wrap
+    def dead_letter_reflow(self, reflow_id):
+        _require()
+        return _json(dead_letter_svc.get_reflow(int(reflow_id)))
 
     @cherrypy.expose
     @_wrap
@@ -575,6 +585,8 @@ class ApiMount:
             action = parts[1] if len(parts) > 1 else "dash"
             if action in ("dash", ""):
                 return api.dead_letter_dash()
+            if action == "state":
+                return api.dead_letter_state()
             if action == "commit":
                 return api.dead_letter_commit()
             if action == "half":
@@ -583,8 +595,10 @@ class ApiMount:
                 return api.dead_letter_snap()
             if action == "cutover":
                 return api.dead_letter_cutover()
-            if action == "dual":
-                return api.dead_letter_dual()
+            if action == "reflows":
+                return api.dead_letter_reflows()
+            if action == "reflow" and len(parts) > 2:
+                return api.dead_letter_reflow(parts[2])
             return _json({"error": "未知回炉钉定路由"}, 404)
 
         return _json({"error": f"未知接口 {path}"}, 404)

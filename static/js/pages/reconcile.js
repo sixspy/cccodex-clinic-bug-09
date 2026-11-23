@@ -2,17 +2,22 @@ import { api, chip, escapeHtml } from '../api.js';
 
 /* dead_letter-board */
 export async function renderReconcile(el) {
-  const [dash, reports, matrix, audits] = await Promise.all([
+  const [dash, reports, matrix, audits, reflow] = await Promise.all([
     api('/api/dashboard'),
     api('/api/reports'),
     api('/api/reports/matrix'),
     api('/api/audits?limit=30'),
+    api('/api/dead_letter/state'),
   ]);
+  const reflowOk = reflow.chip === '回炉已亮';
 
   el.innerHTML = `
     <div class="card">
-      <h2><span class="chip" data-thick="dead_letter">回炉已亮</span> 访视对账台</h2>
+      <h2>访视对账台</h2>
       <p class="muted">对照缺口行、开放质控发现与补采队列，找出无发现缺口、陈旧发现、未覆盖补采等不一致。</p>
+      <p class="muted">死信回炉读值：<span class="chip ${reflowOk ? 'ok' : 'bad'}">${escapeHtml(reflow.chip)}</span>
+        死信 ${reflow.dead_letter_count} · 已入包 ${reflow.covered_count} · 缺行 ${reflow.missing_count} ·
+        落点行 ${reflow.landing_count} · 读轨 ${escapeHtml(reflow.active_read)}</p>
       <div class="grid">
         <div class="stat"><div class="n">${dash.gaps}</div><div class="l">当前缺口行</div></div>
         <div class="stat"><div class="n">${dash.open_findings}</div><div class="l">开放发现</div></div>

@@ -68,6 +68,9 @@ def enqueue_from_row(row_id: int, db_path: str | None = None) -> dict:
     row_id = int(row_id or 0)
     if row_id <= 0:
         raise ServiceError("必须指定访视行")
+    from app.services.dead_letter import require_pack_or_raise
+
+    require_pack_or_raise(db_path)
     with get_db(db_path) as conn:
         row = conn.execute("SELECT * FROM visit_rows WHERE id=?", (row_id,)).fetchone()
         if not row:
@@ -109,8 +112,9 @@ def enqueue_from_row(row_id: int, db_path: str | None = None) -> dict:
 
 
 def enqueue_gaps_for_batch(batch_id: int, db_path: str | None = None) -> dict:
-    from app.services.dead_letter import commit_action
-    commit_action({"enqueue_batch": batch_id}, db_path)
+    from app.services.dead_letter import require_pack_or_raise
+
+    require_pack_or_raise(db_path)
     with get_db(db_path) as conn:
         rows = conn.execute(
             """

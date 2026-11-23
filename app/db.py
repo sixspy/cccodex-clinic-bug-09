@@ -107,6 +107,34 @@ CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS dead_letter_reflows (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  status TEXT NOT NULL CHECK (status IN ('settled','failed')),
+  fate TEXT NOT NULL DEFAULT 'cutover_book',
+  note TEXT NOT NULL DEFAULT '',
+  fingerprint TEXT NOT NULL DEFAULT '',
+  dead_count INTEGER NOT NULL DEFAULT 0,
+  row_count INTEGER NOT NULL DEFAULT 0,
+  error TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  settled_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS dead_letter_reflow_rows (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reflow_id INTEGER NOT NULL REFERENCES dead_letter_reflows(id),
+  job_id INTEGER NOT NULL,
+  job_code TEXT NOT NULL DEFAULT '',
+  row_id INTEGER NOT NULL DEFAULT 0,
+  subject_key TEXT NOT NULL DEFAULT '',
+  visit_code TEXT NOT NULL DEFAULT '',
+  batch_code TEXT NOT NULL DEFAULT '',
+  site_name TEXT NOT NULL DEFAULT '',
+  message TEXT NOT NULL DEFAULT '',
+  landed_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(reflow_id, job_id)
+);
 """
 
 

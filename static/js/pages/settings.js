@@ -66,34 +66,22 @@ export async function renderSettings(el) {
   try {
     const dash = await api('/api/dead_letter/dash');
     el.innerHTML += `<div class="card" style="margin-top:1rem">
-      <h3>回炉钉定</h3>
-      <span class="chip">${dash.chip}</span>
-      <p class="muted">读轨 ${dash.active_read} · 切流指纹 ${dash.cutover_fp || '空'} · 拒回刷 ${dash.reject_refresh} · 归档 ${dash.archive_count} · 新旗 ${dash.live_flag || '空'} · 对齐差 ${dash.panel_pack_mismatch}</p>
+      <h3>回炉钉定 · 甲路（物化包 / cutover_book）</h3>
+      <span class="chip ${dash.chip === '回炉已亮' ? 'ok' : 'bad'}">${escapeHtml(dash.chip)}</span>
+      <p class="muted">读轨 ${escapeHtml(dash.active_read)} · 指纹 ${dash.cutover_fp ? escapeHtml(dash.cutover_fp.slice(0, 12)) + '…' : '空'} · 拒回刷 ${dash.reject_refresh ? '是' : '否'} · 死信 ${dash.dead_letter_count} · 已入包 ${dash.covered_count} · 缺行 ${dash.missing_count} · 落点行 ${dash.landing_count}</p>
       <div class="row">
-        <button id="go_dead_letter" type="button">落台</button>
-        <button id="half_dead_letter" type="button">半修对齐</button>
-        <button id="cut_dead_letter" type="button">切流账册</button>
-        <button id="dual_dead_letter" type="button">双写两轨</button>
+        <button id="go_dead_letter" type="button">落定回炉</button>
+        <button id="half_dead_letter" type="button">仅亮面板（驳回）</button>
       </div>
     </div>`;
     const go = el.querySelector('#go_dead_letter');
     if (go) go.onclick = async () => {
-      await api('/api/dead_letter/commit', { method:'POST', body: JSON.stringify({ref:1}) });
+      await api('/api/dead_letter/commit', { method:'POST', body: JSON.stringify({note:'台参数落定'}) });
       await renderSettings(el);
     };
     const half = el.querySelector('#half_dead_letter');
     if (half) half.onclick = async () => {
       await api('/api/dead_letter/half', { method:'POST', body:'{}' });
-      await renderSettings(el);
-    };
-    const cut = el.querySelector('#cut_dead_letter');
-    if (cut) cut.onclick = async () => {
-      await api('/api/dead_letter/cutover', { method:'POST', body: JSON.stringify({ref_id:1, note:'死信回炉'}) });
-      await renderSettings(el);
-    };
-    const dual = el.querySelector('#dual_dead_letter');
-    if (dual) dual.onclick = async () => {
-      await api('/api/dead_letter/dual', { method:'POST', body: JSON.stringify({note:'死信回炉'}) });
       await renderSettings(el);
     };
   } catch (e) { /* optional surface */ }

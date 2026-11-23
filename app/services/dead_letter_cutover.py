@@ -1,66 +1,32 @@
-"""死信回炉切流账册：应锁当刻指纹并拒回刷；当前只记软笔记。"""
+"""死信回炉切流账册（甲路收口面）。
+
+本模块只做甲路（``cutover_book``）的读写入口，全部落到
+:mod:`app.services.dead_letter` 的物化包落点行与钉定状态，不再另开一侧。
+"""
 from __future__ import annotations
 
-from app.db import get_db
-from app.services.dead_letter import (
-    active_read_ref,
-    cutover_fp,
-    dashboard,
-    panel_chip,
-    record_event,
-    reject_refresh,
-    truth_flag,
-)
+from app.services.dead_letter import dashboard, get_reflow, list_reflows, settle_reflow
 
-_SLUG = "dead_letter"
 _TITLE = "死信回炉"
-_OK = "回炉已亮"
-_BAD = "死信仍静"
 
 
 def append_cutover(ref_id: int, note: str, db_path: str | None = None) -> dict:
-    with get_db(db_path) as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)",
-            (f"{_SLUG}_cutover_note_{ref_id}", note or _TITLE),
-        )
-        # missing: durable fp lock + reject_refresh=1 + active_read=cutover_book
-        conn.execute(
-            "INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)",
-            (f"{_SLUG}_panel_chip", _OK),
-        )
-    record_event(f"cutover-note ref={ref_id} {note}", db_path)
-    return {
-        "ref_id": ref_id,
-        "note": note,
-        "panel": panel_chip(db_path),
-        "truth": truth_flag(db_path),
-        "active_read": active_read_ref(db_path),
-        "cutover_fp": cutover_fp(db_path),
-        "reject_refresh": reject_refresh(db_path),
-    }
+    """落台切流账册：写物化包落点行并钉死读轨。"""
+    del ref_id  # 甲路以当刻真实死信集为准，不再依赖外部 ref
+    return settle_reflow({"note": note or _TITLE}, db_path)
 
 
 def cutover_rows(db_path: str | None = None) -> list[dict]:
-    with get_db(db_path) as conn:
-        rows = conn.execute(
-            "SELECT key, value FROM meta WHERE key LIKE ? ORDER BY key",
-            (f"{_SLUG}_cutover_%",),
-        ).fetchall()
-        return [
-            {
-                "key": r["key"],
-                "value": r["value"],
-                "chip": panel_chip(db_path),
-                "active_read": active_read_ref(db_path),
-            }
-            for r in rows
-        ]
+    """切流账册名录：最近若干次落定记录。"""
+    return list_reflows(db_path)
+
+
+def landing_rows(reflow_id: int, db_path: str | None = None) -> list[dict]:
+    return get_reflow(reflow_id, db_path)["rows"]
 
 
 def board(db_path: str | None = None) -> dict:
     dash = dashboard(db_path)
-    dash["cutover"] = cutover_rows(db_path)
     dash["fate"] = "cutover_book"
-    dash["panel_pack_mismatch"] = dash.get("panel_pack_mismatch", True)
+    dash["cutover"] = cutover_rows(db_path)
     return dash
